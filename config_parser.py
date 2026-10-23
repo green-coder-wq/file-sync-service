@@ -4,7 +4,6 @@ import sys
 
 
 def read_config(config_path: str) -> dict:
-    """Читает config.ini и возвращает словарь с настройками."""
     if not os.path.exists(config_path):
         print(f"Ошибка: Файл конфигурации {config_path} не найден.")
         sys.exit(1)
@@ -12,11 +11,11 @@ def read_config(config_path: str) -> dict:
     config = configparser.ConfigParser()
     config.read(config_path, encoding="utf-8")
 
-    if "Settings" not in config:
+    try:
+        settings = config["Settings"]
+    except KeyError:
         print("Ошибка: В файле конфигурации отсутствует секция [Settings].")
         sys.exit(1)
-
-    settings = config["Settings"]
 
     local_folder = settings.get("local_folder")
     if not local_folder or not os.path.isdir(local_folder):
