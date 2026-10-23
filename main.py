@@ -8,34 +8,27 @@ from yandex_disk import YandexDisk
 
 
 def main() -> None:
-    """Точка входа в программу."""
     try:
-        # 1. Читаем конфигурацию
         settings = read_config("config.ini")
     except SystemExit:
         sys.exit(1)
 
-    # 2. Настраиваем логгер
     logger = setup_logger(settings["log_file"])
     logger.info(f"Программа синхронизации файлов начинает работу с директорией {settings['local_folder']}.")
 
-    # 3. Инициализируем клиент Яндекс.Диска
     disk_client = YandexDisk(settings["token"], settings["remote_folder"])
 
-    # 4. Проверяем доступ к облаку (проверка токена)
+    # Проверка доступа к облаку
     test_info = disk_client.get_info()
     if not test_info:
         logger.error("Ошибка подключения к Яндекс.Диску. Проверьте токен и имя папки.")
         sys.exit(1)
 
-    # 5. Запускаем бесконечный цикл синхронизации
     while True:
         try:
             sync_once(settings["local_folder"], disk_client, logger)
         except Exception as error:
-            # Ловим любые непредвиденные ошибки, чтобы цикл не прерывался
             logger.error(f"Непредвиденная ошибка в процессе синхронизации: {error}")
-        
         time.sleep(settings["sync_period"])
 
 
