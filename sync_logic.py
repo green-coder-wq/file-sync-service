@@ -1,5 +1,5 @@
 import os
-from typing import Set
+from typing import Dict, Set
 from yandex_disk import YandexDisk
 
 
@@ -10,12 +10,13 @@ def get_local_files(folder_path: str) -> Set[str]:
         return set()
 
 
-def get_remote_files(disk_client: YandexDisk) -> Set[str]:
+def get_remote_files(disk_client: YandexDisk) -> Dict[str, int]:
+    """Возвращает словарь {имя_файла: размер} для файлов в облаке."""
     info = disk_client.get_info()
     if not info or "_embedded" not in info:
-        return set()
+        return {}
     items = info["_embedded"].get("items", [])
-    return {item["name"] for item in items if item.get("type") == "file"}
+    return {item["name"]: item.get("size", 0) for item in items if item.get("type") == "file"}
 
 
 def get_file_size(path: str) -> int:
@@ -25,8 +26,8 @@ def get_file_size(path: str) -> int:
         return -1
 
 
-def upload_new_files(local_files: Set[str], remote_files: Set[str], local_folder: str, disk_client: YandexDisk, logger) -> None:
-    files_to_upload = local_files - remote_files
+def upload_new_files(local_files: Set[str], remote_files: Dict[str, int], local_folder: str, disk_client: YandexDisk, logger) -> None:
+    files_to_upload = local_files - set(remote_files.keys())
     for filename in files_to_upload:
         full_path = os.path.join(local_folder, filename)
         success = disk_client.load(full_path)
@@ -36,8 +37,8 @@ def upload_new_files(local_files: Set[str], remote_files: Set[str], local_folder
             logger.error(f"Файл {filename} не записан. Ошибка соединения.")
 
 
-def delete_missing_files(local_files: Set[str], remote_files: Set[str], disk_client: YandexDisk, logger) -> None:
-    files_to_delete = remote_files - local_files
+def delete_missing_files(local_files: Set[str], remote_files: Dict[str, int], disk_client: YandexDisk, logger) -> None:
+    files_to_delete = set(remote_files.keys()) - local_files
     for filename in files_to_delete:
         success = disk_client.delete(filename)
         if success:
@@ -46,25 +47,23 @@ def delete_missing_files(local_files: Set[str], remote_files: Set[str], disk_cli
             logger.error(f"Файл {filename} не удален. Ошибка соединения.")
 
 
-def update_existing_files(local_files: Set[str], remote_files: Set[str], local_folder: str, disk_client: YandexDisk, logger) -> None:
-    common_files = local_files & remote_files
+def update_existing_files(local_files: Set[str], remote_files: Dict[str, int], local_folder: str, disk_client: YandexDisk, logger) -> None:
+    common_files = local_files & set(remote_files.keys())
     for filename in common_files:
         full_path = os.path.join(local_folder, filename)
         local_size = get_file_size(full_path)
-        
+        remote_size = remote_files[filename]
+
         if local_size == -1:
             logger.error(f"Файл {filename} не перезаписан. Ошибка чтения локального файла.")
             continue
 
-        # По ТЗ: "При изменении локального файла его новая версия загружается".
-        # Так как мы не храним хеши, перезаписываем только если размер изменился.
-        # Для простоты и надежности (чтобы не пропустить изменения) перезаписываем всегда.
-        # Но чтобы не спамить, можно добавить проверку. Оставим перезапись.
-        success = disk_client.reload(full_path)
-        if success:
-            logger.info(f"Файл {filename} успешно перезаписан.")
-        else:
-            logger.error(f"Файл {filename} не перезаписан. Ошибка соединения.")
+        if local_size != remote_size:
+            success = disk_client.reload(full_path)
+            if success:
+                logger.info(f"Файл {filename} успешно перезаписан.")
+            else:
+                logger.error(f"Файл {filename} не перезаписан. Ошибка соединения.")
 
 
 def sync_once(local_folder: str, disk_client: YandexDisk, logger) -> None:
