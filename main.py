@@ -18,9 +18,8 @@ def main() -> None:
 
     disk_client = YandexDisk(settings["token"], settings["remote_folder"])
 
-    # Проверка доступа к облаку
     test_info = disk_client.get_info()
-    if not test_info:
+    if test_info is None:
         logger.error("Ошибка подключения к Яндекс.Диску. Проверьте токен и имя папки.")
         sys.exit(1)
 
