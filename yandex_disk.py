@@ -12,16 +12,16 @@ class YandexDisk:
         self.remote_folder = remote_folder.strip("/")
         self.headers = {"Authorization": f"OAuth {self.token}"}
 
-    def get_info(self) -> dict:
-        """Получает информацию о файлах. Возвращает пустой dict при ошибке."""
+    def get_info(self) -> dict | None:
+        """Получает информацию о файлах. Возвращает None при ошибке."""
         url = f"{self.BASE_URL}?path={self.remote_folder}"
         try:
             response = requests.get(url, headers=self.headers, timeout=10)
             if response.status_code == 200:
                 return response.json()
-            return {}
+            return None
         except requests.RequestException:
-            return {}
+            return None
 
     def load(self, local_path: str) -> bool:
         filename = os.path.basename(local_path)
